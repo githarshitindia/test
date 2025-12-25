@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CODELY.FUN</title>
+    <link rel="icon" type="image/png" href="https://www.codely.fun/logo.png">
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1; --primary-hover: #4f46e5;
+            --bg: #f8fafc; --sidebar: #ffffff; --text: #0f172a;
+            --text-light: #64748b; --border: #e2e8f0;
+            --danger: #ef4444; --success: #22c55e;
+            --code-bg: #1e1e2e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background: var(--bg); color: var(--text); min-height: 100vh; }
+        
+        #app-shell { 
+            display: none;
+            grid-template-columns: 280px 1fr; 
+            min-height: 100vh; 
+        }
+
+        aside { 
+            background: var(--sidebar); 
+            border-right: 1px solid var(--border); 
+            padding: 2rem; 
+            display: flex; 
+            flex-direction: column;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        .logo { font-size: 1.4rem; font-weight: 800; color: var(--text); margin-bottom: 2.5rem; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        
+        .logo-box { 
+            width: 42px;
+            height: 42px;
+            background: var(--primary); 
+            border-radius: 50%;
+            min-width: 42px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 800;
+        }
+
+        main { padding: 3rem; width: 100%; max-width: 1200px; }
+
+        .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+        .card { 
+            background: white; 
+            border: 1px solid var(--border); 
+            border-radius: 16px; 
+            padding: 1.5rem; 
+            transition: transform 0.2s, box-shadow 0.2s; 
+        }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(0,0,0,0.05); }
+
+        .btn { padding: 0.75rem 1.25rem; border-radius: 10px; cursor: pointer; font-weight: 600; border: none; transition: 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; }
+        .btn-danger { background: #fee2e2; color: var(--danger); }
+        .btn-danger:hover { background: #fecaca; }
+        .btn-ghost { background: transparent; border: 1px solid var(--border); }
+
+        .limit-box { background: #f1f5f9; padding: 1.25rem; border-radius: 14px; margin-top: auto; }
+        .hidden { display: none !important; }
+
+        #view-login { 
+            position: fixed; inset: 0; background: white; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            z-index: 5000; text-align: center;
+        }
+
+        .modal { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); display: flex; align-items: center; justify-content: center; z-index: 6000; backdrop-filter: blur(4px); }
+        .modal-content { background: white; padding: 2.5rem; border-radius: 24px; width: 95%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); text-align: center; }
+        
+        .ban-icon { width: 64px; height: 64px; background: #fee2e2; color: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; }
+        .ban-title { font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 1rem; }
+        .ban-text { color: #64748b; line-height: 1.6; margin-bottom: 2rem; font-size: 0.95rem; }
+        .ban-link { color: var(--primary); text-decoration: none; font-weight: 700; }
+
+        textarea { width: 100%; height: 350px; margin-top: 1rem; border-radius: 12px; border: 1px solid var(--border); padding: 1rem; font-family: monospace; background: #f8fafc; resize: none; }
+
+        #loading-overlay { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 9999; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #username-status { font-size: 0.8rem; margin-top: 4px; font-weight: 600; }
+        .status-error { color: var(--danger); }
+        .status-success { color: var(--success); }
+
+        #viewer-container { 
+            position: fixed; inset: 0; width: 100vw; height: 100vh; background: white; z-index: 10000;
+        }
+        #render-frame { width: 100%; height: 100%; border: none; display: block; }
+        .footer-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+        .footer-links a { font-size: 0.75rem; color: var(--text-light); text-decoration: none; font-weight: 600; }
+        .footer-links a:hover { color: var(--primary); }
+
+        #ai-chat-history::-webkit-scrollbar { width: 6px; }
+        #ai-chat-history::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .nav-item { cursor: pointer; padding: 0.75rem; border-radius: 10px; font-weight: 600; transition: 0.2s; margin-top: 4px; }
+        .nav-active { background: #eef2ff; color: var(--primary); }
+        .nav-inactive { color: var(--text-light); }
+
+        .code-container {
+            background: var(--code-bg);
+            border-radius: 12px;
+            margin: 15px 0;
+            overflow: hidden;
+            position: relative;
+        }
+        .code-header {
+            background: #2d2d3d;
+            padding: 8px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #a9b1d6;
+            font-size: 0.75rem;
+        }
+        .copy-btn {
+            background: #44475a;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+        }
+        .copy-btn:hover { background: #6272a4; }
+        .code-content {
+            padding: 16px;
+            overflow-x: auto;
+            color: #f8f8f2;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .chip {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .chip:hover { background: var(--primary); color: white; border-color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="loading-overlay"><div class="spinner"></div></div>
+
+    <div id="view-login" class="hidden">
+        <div class="logo"><div class="logo-box">&lt;c.ly&gt;</div> Codely.fun</div>
+        <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">CODE > PUBLISH > SHARE</h1>
+        <p style="color: var(--text-light); margin-bottom: 2rem;">Launch your site today..</p>
+        <button id="google-login" class="btn btn-primary" style="padding: 1rem 2.5rem; font-size: 1rem;">Sign in with Google</button>
+    </div>
+
+    <div id="ban-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="ban-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+            </div>
+            <h2 class="ban-title">Account Restricted</h2>
+            <p class="ban-text">
+                Your access to Codely.fun has been suspended for violating our 
+                <a href="https://www.codely.fun/terms&conditions" class="ban-link">Terms of Service</a>. 
+                <br><br>
+                Think this is a mistake? Reach out to us at:
+                <strong style="color: var(--text); display: block; margin-top: 8px;">support@codely.fun</strong>
+            </p>
+            <button onclick="auth.signOut(); location.reload();" class="btn btn-primary" style="width: 100%;">Understood</button>
+        </div>
+    </div>
+
+    <div id="app-shell">
+        <aside>
+            <div class="logo" onclick="location.reload()"><div class="logo-box">&lt;c.ly&gt;</div> Codely.fun</div>
+            <nav style="flex: 1;">
+                <p style="font-size: 0.7rem; font-weight: 800; color: var(--text-light); letter-spacing: 1px; margin-bottom: 1rem;">MAIN MENU</p>
+                <div id="nav-projects" onclick="switchView('projects')" class="nav-item nav-active">📁 My Projects</div>
+                <div id="nav-ai" onclick="switchView('ai')" class="nav-item nav-inactive">🤖 AI Studio</div>
+                <a href="https://www.codely.fun/store" style="display: block; color: var(--text-light); padding: 0.75rem; border-radius: 10px; font-weight: 600; text-decoration: none; margin-top: 4px;">🎨 Free Templates</a>
+            </nav>
+            
+            <div class="footer-links">
+                <a href="https://www.codely.fun/about">About</a>
+                <a href="https://www.codely.fun/terms&conditions">Terms & Conditions</a>
+            </div>
+
+            <div class="limit-box">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="font-size: 0.8rem; font-weight: 600;">Usage</span>
+                    <span style="font-size: 0.8rem; font-weight: 800;" id="usage-count">0/1</span>
+                </div>
+                <div style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden;">
+                    <div id="usage-bar" style="width: 0%; height: 100%; background: var(--primary); transition: 0.5s;"></div>
+                </div>
+                <button onclick="showPremium()" class="btn" style="margin-top: 1rem; width: 100%; background: #0f172a; color: white; font-size: 0.75rem;">Get Premium</button>
+            </div>
+            
+            <button id="logout-btn" class="btn btn-ghost" style="margin-top: 1rem; color: var(--danger); border: none;">Logout</button>
+        </aside>
+
+        <main>
+            <div id="view-projects">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h1 style="font-size: 2rem;">Projects</h1>
+                        <p style="color: var(--text-light);">Manage your live portfolio links</p>
+                    </div>
+                    <button id="new-project-btn" class="btn btn-primary" style="box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);">+ New Site</button>
+                </div>
+                <div class="project-grid" id="project-list"></div>
+            </div>
+
+            <div id="view-ai" class="hidden">
+                <h1 style="font-size: 2rem;">AI Studio</h1>
+                <p style="color: var(--text-light);">Solve your code-related questions instantly</p>
+                
+                <div style="background: white; border: 1px solid var(--border); border-radius: 16px; margin-top: 2rem; height: calc(100vh - 250px); display: flex; flex-direction: column; overflow: hidden;">
+                    <div id="ai-chat-history" style="flex: 1; padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; background: #fafafa;">
+                        <div style="background: var(--primary); color: white; padding: 12px 16px; border-radius: 12px 12px 12px 0; align-self: flex-start; max-width: 80%; font-size: 0.9rem;">
+                            Hello! I'm your Codely AI. Ask me any HTML, CSS, or JavaScript questions!
+                        </div>
+                    </div>
+
+                    <div style="padding: 10px 1.25rem; display: flex; gap: 8px; flex-wrap: wrap; background: white; border-top: 1px solid var(--border);">
+                        <div class="chip" onclick="quickAsk('Make a simple website')">Make a simple website</div>
+                        <div class="chip" onclick="quickAsk('I have an error in my code')">I have an error</div>
+                    </div>
+
+                    <div style="padding: 1.25rem; border-top: 1px solid var(--border); display: flex; gap: 12px; background: white;">
+                        <input type="text" id="ai-input" placeholder="How do I center a div?" style="flex: 1; padding: 0.8rem 1.2rem; border: 1px solid var(--border); border-radius: 12px; outline: none; font-size: 0.9rem;" onkeypress="if(event.key === 'Enter') askAI()">
+                        <button onclick="askAI()" class="btn btn-primary" style="padding: 0 1.5rem;">Ask AI</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="editor-modal" class="modal hidden">
+        <div class="modal-content" style="text-align: left; max-width: 800px; width: 90%;">
+            <h2 id="modal-title">New Portfolio</h2>
+            <div style="margin-top: 1.5rem;">
+                <label style="font-size: 0.85rem; font-weight: 700;">Claim URL</label>
+                <div style="display: flex; align-items: center; border: 1px solid var(--border); border-radius: 10px; padding: 0.5rem 1rem; margin-top: 0.5rem; background: #f8fafc;">
+                    <span style="color: var(--text-light); font-size: 0.9rem;">www.codely.fun/</span>
+                    <input type="text" id="username-input" placeholder="username" style="flex: 1; border: none; background: transparent; outline: none; font-weight: 600; font-size: 0.9rem; padding-left: 4px;">
+                </div>
+                <div id="username-status"></div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-top: 1rem;">Code Editor</label>
+                    <textarea id="code-input" placeholder="Paste your HTML here..." style="height: 300px;" oninput="updateLivePreview()"></textarea>
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 700; display: block; margin-top: 1rem;">Live Preview</label>
+                    <div style="height: 300px; margin-top: 1rem; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: white;">
+                        <iframe id="live-preview-frame" style="width: 100%; height: 100%; border: none;"></iframe>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 1.5rem;">
+                <button onclick="closeModal()" class="btn btn-ghost" style="flex: 1;">Cancel</button>
+                <button id="save-btn" class="btn btn-primary" style="flex: 2;" disabled>Publish Site</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="viewer-container" class="hidden">
+        <iframe id="render-frame" sandbox="allow-scripts allow-forms allow-modals allow-same-origin allow-popups allow-presentation"></iframe>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyDDtI87HqginEcEoSD1te75yxDgpEQDqy0",
+            authDomain: "online-proto-codely.firebaseapp.com",
+            projectId: "online-proto-codely",
+            storageBucket: "online-proto-codely.firebasestorage.app",
+            messagingSenderId: "555824275466",
+            appId: "1:555824275466:web:50c856acbc9ae02b82fff3"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null;
+        let userData = null;
+        let myProjects = [];
+
+        const init = async () => {
+            const path = window.location.pathname.split('/').filter(p => p !== "" && p !== "index.html" && p !== "404.html").pop();
+            if (path) { renderPublicPortfolio(path); } else { setupAuthListener(); }
+        };
+
+        const renderPublicPortfolio = async (username) => {
+            try {
+                const doc = await db.collection('portfolios').doc(username).get();
+                if (doc.exists) {
+                    const htmlCode = doc.data().html;
+                    const iframe = document.getElementById('render-frame');
+                    const blob = new Blob([htmlCode], { type: 'text/html;charset=UTF-8' });
+                    const url = URL.createObjectURL(blob);
+                    iframe.onload = () => {
+                        document.getElementById('loading-overlay').classList.add('hidden');
+                        document.getElementById('viewer-container').classList.remove('hidden');
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    };
+                    iframe.src = url;
+                } else { window.location.href = "/"; }
+            } catch (e) { window.location.href = "/"; }
+        };
+
+        const setupAuthListener = () => {
+            auth.onAuthStateChanged(async (user) => {
+                document.getElementById('loading-overlay').classList.add('hidden');
+                if (user) {
+                    currentUser = user;
+                    const userRef = db.collection('users').doc(user.uid);
+                    const userDoc = await userRef.get();
+                    if (!userDoc.exists) {
+                        userData = { name: user.displayName, email: user.email, isUserBan: false, UserTotalSlot: 1 };
+                        await userRef.set(userData);
+                    } else { userData = userDoc.data(); }
+                    if (userData.isUserBan) {
+                        document.getElementById('ban-modal').classList.remove('hidden');
+                        return;
+                    }
+                    document.getElementById('app-shell').style.display = 'grid';
+                    document.getElementById('view-login').classList.add('hidden');
+                    refreshProjects();
+                } else {
+                    document.getElementById('view-login').classList.remove('hidden');
+                    document.getElementById('app-shell').style.display = 'none';
+                }
+            });
+        };
+
+        function switchView(view) {
+            document.getElementById('view-projects').classList.toggle('hidden', view !== 'projects');
+            document.getElementById('view-ai').classList.toggle('hidden', view !== 'ai');
+            document.getElementById('nav-projects').className = view === 'projects' ? 'nav-item nav-active' : 'nav-item nav-inactive';
+            document.getElementById('nav-ai').className = view === 'ai' ? 'nav-item nav-active' : 'nav-item nav-inactive';
+        }
+
+        function quickAsk(text) {
+            document.getElementById('ai-input').value = text;
+            askAI();
+        }
+
+        async function typeEffect(element, text) {
+            element.innerHTML = "";
+            const history = document.getElementById('ai-chat-history');
+            const segments = text.split(/```([\s\S]*?)```/g);
+            
+            for (let idx = 0; idx < segments.length; idx++) {
+                if (idx % 2 === 0) {
+                    const segmentText = segments[idx];
+                    for (let char of segmentText) {
+                        element.innerHTML += char === '\n' ? '<br>' : char;
+                        history.scrollTop = history.scrollHeight;
+                        await new Promise(r => setTimeout(r, 5));
+                    }
+                } else {
+                    const code = segments[idx].trim();
+                    const codeHtml = `
+                        <div class="code-container">
+                            <div class="code-header">
+                                <span>Code Snippet</span>
+                                <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                            </div>
+                            <pre class="code-content">${code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
+                        </div>
+                    `;
+                    element.innerHTML += codeHtml;
+                    history.scrollTop = history.scrollHeight;
+                }
+            }
+        }
+
+        window.copyCode = (btn) => {
+            const code = btn.parentElement.nextElementSibling.innerText;
+            navigator.clipboard.writeText(code);
+            btn.innerText = "Copied!";
+            setTimeout(() => btn.innerText = "Copy", 2000);
+        };
+
+        async function askAI() {
+            const input = document.getElementById('ai-input');
+            const history = document.getElementById('ai-chat-history');
+            const question = input.value.trim();
+            if (!question) return;
+
+            history.innerHTML += `<div style="background: white; border: 1px solid var(--border); padding: 12px 16px; border-radius: 12px; align-self: flex-end; max-width: 80%; font-size: 0.9rem;">${question}</div>`;
+            input.value = "";
+            
+            const loadingId = "ai-loading-" + Date.now();
+            history.innerHTML += `<div id="${loadingId}" style="background: var(--primary); color: white; padding: 12px 16px; border-radius: 12px; align-self: flex-start; max-width: 80%; font-size: 0.9rem; line-height: 1.5;">Thinking...</div>`;
+            history.scrollTop = history.scrollHeight;
+
+            try {
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ question: question })
+                });
+
+                const data = await response.json();
+                const aiBox = document.getElementById(loadingId);
+                
+                if (data.choices && data.choices[0]) {
+                    await typeEffect(aiBox, data.choices[0].message.content);
+                } else {
+                    aiBox.innerText = "Unable to get response.";
+                }
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Error connecting to AI.";
+            } finally {
+                history.scrollTop = history.scrollHeight;
+            }
+        }
+
+        function updateLivePreview() {
+            const code = document.getElementById('code-input').value;
+            const frame = document.getElementById('live-preview-frame');
+            const blob = new Blob([code], { type: 'text/html' });
+            frame.src = URL.createObjectURL(blob);
+        }
+
+        document.getElementById('username-input').addEventListener('input', async (e) => {
+            const username = e.target.value.trim().toLowerCase();
+            const statusDiv = document.getElementById('username-status');
+            const saveBtn = document.getElementById('save-btn');
+            if (!username) { statusDiv.innerHTML = ""; saveBtn.disabled = true; return; }
+            if (document.getElementById('username-input').disabled) return;
+            try {
+                const doc = await db.collection('portfolios').doc(username).get();
+                statusDiv.innerHTML = doc.exists ? '<span class="status-error">❌ Taken</span>' : '<span class="status-success">✅ Available</span>';
+                saveBtn.disabled = doc.exists;
+            } catch (err) { console.error(err); }
+        });
+
+        async function refreshProjects() {
+            const snap = await db.collection('portfolios').where('owner', '==', currentUser.uid).get();
+            myProjects = snap.docs.map(doc => doc.data());
+            document.getElementById('usage-count').textContent = `${myProjects.length}/${userData.UserTotalSlot}`;
+            document.getElementById('usage-bar').style.width = (myProjects.length / userData.UserTotalSlot * 100) + "%";
+            const list = document.getElementById('project-list');
+            list.innerHTML = "";
+            myProjects.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "card";
+                card.innerHTML = `
+                    <h3 style="font-weight:700">${p.username}</h3>
+                    <p style="font-size:0.8rem;color:var(--text-light);margin-bottom:1rem">codely.fun/${p.username}</p>
+                    <div style="display: flex; gap: 8px;">
+                        <button onclick="editProject('${p.username}')" class="btn btn-ghost" style="flex: 1;">Edit Code</button>
+                        <button onclick="deleteProject('${p.username}')" class="btn btn-danger" style="padding: 0.75rem;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>`;
+                list.appendChild(card);
+            });
+            document.getElementById('new-project-btn').onclick = () => {
+                if (myProjects.length >= userData.UserTotalSlot) { alert("Limit reached."); } else { openProjectModal(); }
+            };
+        }
+
+        window.deleteProject = async (username) => {
+            if (confirm(`Are you sure you want to delete "${username}"? This cannot be undone.`)) {
+                try {
+                    await db.collection('portfolios').doc(username).delete();
+                    refreshProjects();
+                } catch (e) {
+                    alert("Error deleting site.");
+                }
+            }
+        };
+
+        function openProjectModal() {
+            document.getElementById('modal-title').textContent = "Create Site";
+            document.getElementById('username-input').value = "";
+            document.getElementById('username-input').disabled = false;
+            document.getElementById('code-input').value = "";
+            updateLivePreview();
+            document.getElementById('editor-modal').classList.remove('hidden');
+        }
+
+        window.editProject = (username) => {
+            const p = myProjects.find(x => x.username === username);
+            document.getElementById('modal-title').textContent = "Update Site";
+            document.getElementById('username-input').value = p.username;
+            document.getElementById('username-input').disabled = true;
+            document.getElementById('code-input').value = p.html;
+            document.getElementById('save-btn').disabled = false;
+            updateLivePreview();
+            document.getElementById('editor-modal').classList.remove('hidden');
+        };
+
+        document.getElementById('save-btn').onclick = async () => {
+            const user = document.getElementById('username-input').value.trim().toLowerCase();
+            const code = document.getElementById('code-input').value;
+            const saveBtn = document.getElementById('save-btn');
+            saveBtn.disabled = true;
+            saveBtn.innerText = "Publishing...";
+            try {
+                await db.collection('portfolios').doc(user).set({ username: user, owner: currentUser.uid, html: code, updatedAt: Date.now() }, { merge: true });
+                closeModal(); refreshProjects();
+            } catch (e) { alert("Error saving."); } finally {
+                saveBtn.disabled = false;
+                saveBtn.innerText = "Publish Site";
+            }
+        };
+
+        function closeModal() { document.getElementById('editor-modal').classList.add('hidden'); }
+        function showPremium() { alert("Coming soon!"); }
+        document.getElementById('google-login').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+        document.getElementById('logout-btn').onclick = () => auth.signOut();
+        init();
+    </script>
+</body>
+</html>
